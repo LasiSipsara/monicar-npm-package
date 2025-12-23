@@ -6,6 +6,7 @@ export interface HealthResult {
   responseTimeMs: number;
   error?: string;
   lastCheckedAt: string;
+  metadata?: Record<string, any>;
 }
 
 export interface HealthCheckResult {
@@ -16,5 +17,25 @@ export interface HealthCheckResult {
     total: number;
     up: number;
     down: number;
+  };
+}
+
+export interface KafkaHealthMetadata {
+  connectivity: {
+    status: 'success' | 'failed';
+    responseTimeMs: number;
+    error?: string;
+  };
+  functional?: {
+    producer?: {
+      status: 'success' | 'failed';
+      responseTimeMs: number;
+      error?: string;
+    };
+    consumer?: {
+      status: 'success' | 'failed';
+      responseTimeMs: number;
+      error?: string;
+    };
   };
 }
