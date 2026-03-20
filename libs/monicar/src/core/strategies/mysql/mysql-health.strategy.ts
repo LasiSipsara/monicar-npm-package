@@ -1,5 +1,5 @@
 // src/core/strategies/mysql/mysql-health.strategy.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { HealthStrategy } from '../../interfaces/health-strategy.interface';
 import { HealthResult } from '../../interfaces/health-results.interfaces';
 import { MysqlConfig } from '../../interfaces/configs.interfaces';
@@ -40,7 +40,6 @@ export class MysqlHealthStrategy implements HealthStrategy {
         user: username,
         password,
         database: database ?? 'mysql',
-        connectionLimit: connectionLimit ?? 1,
         ssl,
         ...basePoolConfig,
       };
@@ -50,6 +49,7 @@ export class MysqlHealthStrategy implements HealthStrategy {
   } 
 
   async check(): Promise<Omit<HealthResult, 'name' | 'lastCheckedAt'>> {
+    Logger.log(`Started checking MySQL health at: ${new Date().toISOString()}`);
     const startTime = Date.now();
     let connection: mysql.PoolConnection | null = null;
 
@@ -59,6 +59,7 @@ export class MysqlHealthStrategy implements HealthStrategy {
         this.createTimeoutPromise<mysql.PoolConnection>('Connection timeout'),
       ]);
 
+      Logger.log(`Excecuting health check query... at ${new Date().toISOString()}`);
       const [rows] = (await Promise.race([
         connection.execute('SELECT 1 AS health'),
         this.createTimeoutPromise('Query timeout'),
@@ -73,6 +74,8 @@ export class MysqlHealthStrategy implements HealthStrategy {
         responseTimeMs: Date.now() - startTime,
       };
     } catch (error) {
+      Logger.error(`MySQL health check error: ${error}`);
+      Logger.log(`MySQL health check failed at: ${new Date().toISOString()}`);
       return {
         status: 'DOWN',
         responseTimeMs: Date.now() - startTime,

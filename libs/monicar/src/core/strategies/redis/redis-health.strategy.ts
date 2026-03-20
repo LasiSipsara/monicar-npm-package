@@ -2,6 +2,7 @@ import Redis, { RedisOptions } from 'ioredis';
 import { HealthResult } from '../../interfaces/health-results.interfaces';
 import { HealthStrategy } from '../../interfaces/health-strategy.interface';
 import { RedisConfig } from '../../interfaces/configs.interfaces';
+import { Logger } from '@nestjs/common';
 
 export class RedisHealthStrategy implements HealthStrategy {
   private readonly client: Redis;
@@ -13,11 +14,17 @@ export class RedisHealthStrategy implements HealthStrategy {
   }
 
   private createClient(): Redis {
+    const baseOptions = {
+      connectTimeout: this.timeoutMs,
+      lazyConnect: true,
+      maxRetriesPerRequest: 0,
+      retryStrategy: null,
+
+    }
     // URI-based config
     if ('uri' in this.config) {
       return new Redis(this.config.uri, {
-        connectTimeout: this.timeoutMs,
-        lazyConnect: true,
+        ...baseOptions
       });
     }
 
@@ -25,8 +32,7 @@ export class RedisHealthStrategy implements HealthStrategy {
     const options: RedisOptions = {
       host: this.config.host,
       port: this.config.port,
-      connectTimeout: this.timeoutMs,
-      lazyConnect: true,
+      ...baseOptions
     };
 
     // OPTIONAL fields (added only if provided)
@@ -47,19 +53,31 @@ export class RedisHealthStrategy implements HealthStrategy {
 
   async check(): Promise<Omit<HealthResult, 'name' | 'lastCheckedAt'>> {
     const startTime = Date.now();
+    Logger.log(`Started checking Redis health at: ${new Date(startTime).toISOString()}`);
 
     try {
-      if (this.client.status === 'end') {
-        await this.client.connect();
+      const idleStatuses = ['wait', 'end', 'close'];
+
+      if (idleStatuses.includes(this.client.status)) {
+         this.client.connect();
       }
 
-      await this.client.ping();
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Redis Heartbeat Timeout')), 2000)
+      );
+ 
+      Logger.log(`Pinging Redis... at ${new Date().toISOString()}`);
+      await Promise.race([this.client.ping(), timeout]);
 
       return {
         status: 'UP',
         responseTimeMs: Date.now() - startTime,
       };
+
     } catch (error) {
+      const timeDetected = Date.now();
+      Logger.log(`Redis health check failed at: ${new Date(timeDetected).toISOString()}`);
+      Logger.error(`Redis health check error: `, error);
       return {
         status: 'DOWN',
         responseTimeMs: Date.now() - startTime,

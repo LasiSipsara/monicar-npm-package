@@ -13,16 +13,14 @@ export class MonicarHealthRunner implements HealthRunner {
     private readonly name: string,
     private readonly strategy: HealthStrategy,
     private readonly intervalMs: number,
-  ) {}
+  ) { }
 
   start(): void {
     if (this.isRunning) {
       return;
     }
-
     this.isRunning = true;
     this.runCheck();
-    this.scheduleNext();
   }
 
   stop(): void {
@@ -41,17 +39,6 @@ export class MonicarHealthRunner implements HealthRunner {
     return this.latestResult;
   }
 
-  private scheduleNext(): void {
-    if (!this.isRunning) {
-      return;
-    }
-
-    this.timer = setTimeout(() => {
-      this.runCheck();
-      this.scheduleNext();
-    }, this.intervalMs);
-  }
-
   private async runCheck(): Promise<void> {
     try {
       const result = await this.strategy.check();
@@ -68,6 +55,12 @@ export class MonicarHealthRunner implements HealthRunner {
         error: error instanceof Error ? error.message : String(error),
         lastCheckedAt: new Date().toISOString(),
       };
+    }
+
+    if (this.isRunning) {
+      this.timer = setTimeout(() => {
+        this.runCheck();
+      }, this.intervalMs);
     }
   }
 
